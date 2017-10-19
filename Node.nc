@@ -196,7 +196,7 @@ implementation{
         }
         return max_node;
     }
-    void makeAdj(){
+    void doDijkAlgo(){
         int size = call LinkStateList.size();
         int i =0;
         int j = 0;
@@ -252,7 +252,6 @@ implementation{
             node_count++;
         }
 
-        //print the path and distance_to_node of each node
         for (i = 0; i < max_node; i++){
             next_hop = TOS_NODE_ID-1;
             if (i != start_node) {
@@ -403,7 +402,7 @@ implementation{
        }
        if ((call neighborNodes.size()) >=1){
            dbg(HASHMAP_CHANNEL, "");
-           makeAdj();
+           doDijkAlgo();
        }
 
 
@@ -411,7 +410,7 @@ implementation{
 
     event void CommandHandler.printRouteTable() {
         int i = 0;
-        makeAdj();
+        doDijkAlgo();
         for(i=0; i<call routingTable.size();i++){
             dbg(GENERAL_CHANNEL, "To get to node %d go to %d first\n", i+1, call routingTable.get(i+1));
         }
