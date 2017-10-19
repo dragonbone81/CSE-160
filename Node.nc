@@ -19,7 +19,7 @@ module Node{
    uses interface SplitControl as AMControl;
    uses interface Receive;
    //uses interface Hashmap<pack> as neighborNodes;
-   uses interface List<pack> as visitedNodesList;
+   uses interface List<pack> as visited_listNodesList;
    uses interface List<int> as neighborNodes;
    uses interface Hashmap<int> as routingTable;
    uses interface List<NeighborStruct> as LinkStateList;
@@ -74,8 +74,8 @@ implementation{
        pack seenPack;
        bool seen = FALSE;
        int i = 0;
-       for (i; i < (call visitedNodesList.size()); i++) {
-          seenPack = call visitedNodesList.get(i);
+       for (i; i < (call visited_listNodesList.size()); i++) {
+          seenPack = call visited_listNodesList.get(i);
           if (seenPack.src == myMsg -> src && seenPack.seq == myMsg -> seq) {
 
              seen = TRUE;
@@ -88,7 +88,7 @@ implementation{
         * just forwards the packet since its not at the destination yet
         */
        myMsg -> TTL--;
-       call visitedNodesList.pushfront( * myMsg);
+       call visited_listNodesList.pushfront( * myMsg);
        if(call routingTable.contains(myMsg -> dest)){
            dbg(NEIGHBOR_CHANNEL, "I know how to get to %d so I will send through %d    %s\n", myMsg -> dest, call routingTable.get(myMsg -> dest), myMsg->payload);
            call Sender.send( * myMsg, call routingTable.get(myMsg -> dest));
@@ -103,7 +103,7 @@ implementation{
         * recieves an init ping and sends a ping reply back to sender
         */
        dbg(GENERAL_CHANNEL, "Message Received at node %d: %s, sending Ping reply to %d\n", TOS_NODE_ID, myMsg -> payload, myMsg -> src);
-       call visitedNodesList.pushfront( * myMsg);
+       call visited_listNodesList.pushfront( * myMsg);
        makePack( & sendPackage, TOS_NODE_ID, myMsg -> src, 50, 1, sequence_number, "Ping reply :)", PACKET_MAX_PAYLOAD_SIZE);
 
        if(call routingTable.contains(myMsg -> src)){
@@ -123,7 +123,7 @@ implementation{
         * basically just stores the packet in the list and maybe says somthing
         */
        dbg(GENERAL_CHANNEL, "got Ping reply from %d: %s\n\n", myMsg -> src, myMsg -> payload);
-       call visitedNodesList.pushfront( * myMsg);
+       call visited_listNodesList.pushfront( * myMsg);
     }
     void receiveAndForwardNeighbors(pack * myMsg){
 
@@ -146,7 +146,7 @@ implementation{
              //dbg(GENERAL_CHANNEL, "TTL is 0 :%d\n", myMsg->payload[0]);
             call LinkStateList.pushfront(stuff);
         }
-        call visitedNodesList.pushfront( * myMsg);
+        call visited_listNodesList.pushfront( * myMsg);
         //dbg(GENERAL_CHANNEL, "received this this %d\n\n", myMsg->payload[0]);
         call Sender.send(*myMsg, AM_BROADCAST_ADDR);
 
@@ -160,7 +160,7 @@ implementation{
          */
         if (myMsg->protocol == 0){
             //protocol is 0 so this is a neighbor recieving a request...send back a pingR
-            call visitedNodesList.pushfront( * myMsg);
+            call visited_listNodesList.pushfront( * myMsg);
             makePack( & sendPackage, TOS_NODE_ID, AM_BROADCAST_ADDR, 1, 1, sequence_number, "neighborDiscovery ping reply", PACKET_MAX_PAYLOAD_SIZE);
             call Sender.send(sendPackage, myMsg->src);
             sequence_number += 1;
@@ -168,7 +168,7 @@ implementation{
             //protocol 1 so this is a printR back from neighbor add to list
             bool seen = FALSE;
             int i = 0;
-            call visitedNodesList.pushfront( * myMsg);
+            call visited_listNodesList.pushfront( * myMsg);
 
             for (i; i < (call neighborNodes.size()); i++) {
                int node;
@@ -202,80 +202,74 @@ implementation{
         int j = 0;
         int next_hop;
         int max_node = calcMax();
-        int cost[max_node][max_node], distance[max_node], pred[max_node];
-        int visited[max_node], count, mindistance, nextnode;
-        int startnode = TOS_NODE_ID-1;
-        bool adjList[max_node][max_node];
+        int cost_matrix[max_node][max_node], distance_to_node[max_node], pred_list[max_node];
+        int visited_list[max_node], node_count, min_distance_to_node_to_node, nextnode;
+        int start_node = TOS_NODE_ID-1;
+        bool adjMatrix[max_node][max_node];
         for(i=0;i<max_node;i++){
             for(j=0;j<max_node;j++){
-                adjList[i][j] = FALSE;
+                adjMatrix[i][j] = FALSE;
             }
         }
         for(i=0; i<size;i++){
             NeighborStruct stuff = call LinkStateList.get(i);
-            adjList[stuff.src-1][stuff.neighborNode-1] = TRUE;
+            adjMatrix[stuff.src-1][stuff.neighborNode-1] = TRUE;
         }
-        /*pred[] stores the predecessor of each node
-        count gives the number of nodes seen so far*/
-
-        //create the cost matrix
-
         for(i=0;i<max_node;i++){
             for(j=0;j<max_node;j++){
-                if (adjList[i][j] == 0)
-                    cost[i][j] = 999999;
+                if (adjMatrix[i][j] == 0)
+                    cost_matrix[i][j] = 999999;
                 else
-                    cost[i][j] = adjList[i][j];
+                    cost_matrix[i][j] = adjMatrix[i][j];
             }
         }
+        //djsdjsdjsd algorithm
         for (i = 0; i < max_node; i++) {
-            distance[i] = cost[startnode][i];
-            pred[i] = startnode;
-            visited[i] = 0;
+            distance_to_node[i] = cost_matrix[start_node][i];
+            pred_list[i] = start_node;
+            visited_list[i] = 0;
         }
-        distance[startnode] = 0;
-        visited[startnode] = 1;
-        count = 1;
-        while (count < max_node - 1) {
-            mindistance = 999999;
-            // nextnode is the node at minimum distance
+        distance_to_node[start_node] = 0;
+        visited_list[start_node] = 1;
+        node_count = 1;
+        while (node_count < max_node - 1) {
+            min_distance_to_node_to_node = 999999;
             for (i = 0; i < max_node; i++){
-                if (distance[i] < mindistance && !visited[i]) {
-                    mindistance = distance[i];
+                if (distance_to_node[i] < min_distance_to_node_to_node && !visited_list[i]) {
+                    min_distance_to_node_to_node = distance_to_node[i];
                     nextnode = i;
                 }
             }
-                //check if a better path exist through nextnode
-            visited[nextnode] = 1;
+            visited_list[nextnode] = 1;
             for (i = 0; i < max_node; i++){
-                if (!visited[i]){
-                    if (mindistance + cost[nextnode][i] < distance[i]) {
-                        distance[i] = mindistance + cost[nextnode][i];
-                        pred[i] = nextnode;
+                if (!visited_list[i]){
+                    if (min_distance_to_node_to_node + cost_matrix[nextnode][i] < distance_to_node[i]) {
+                        distance_to_node[i] = min_distance_to_node_to_node + cost_matrix[nextnode][i];
+                        pred_list[i] = nextnode;
                     }
                 }
             }
-            count++;
+            node_count++;
         }
 
-        //print the path and distance of each node
+        //print the path and distance_to_node of each node
         for (i = 0; i < max_node; i++){
             next_hop = TOS_NODE_ID-1;
-            if (i != startnode) {
-                //dbg(GENERAL_CHANNEL, "Distance of %d = %d \n", i + 1, distance[i]);
+            if (i != start_node) {
+                //dbg(GENERAL_CHANNEL, "distance_to_node of %d = %d \n", i + 1, distance_to_node[i]);
                 //dbg(GENERAL_CHANNEL, "Path = %d \n", i + 1);
                 j = i;
                 do {
-                    if (j!=startnode){
+                    if (j!=start_node){
                         next_hop = j+1;
                     }
-                    j = pred[j];
+                    j = pred_list[j];
                     //dbg(GENERAL_CHANNEL, "<- %d \n", j + 1);
 
-                } while (j != startnode);
+                } while (j != start_node);
             }
             else{
-                next_hop = startnode+1;
+                next_hop = start_node+1;
             }
             call routingTable.insert(i+1, next_hop);
         }
@@ -432,7 +426,7 @@ implementation{
         }
     }
 
-    event void CommandHandler.printDistanceVector() {}
+    event void CommandHandler.printdistance_to_nodeVector() {}
 
     event void CommandHandler.setTestServer() {}
 
