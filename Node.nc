@@ -370,7 +370,7 @@ implementation{
     }
 
     event void Timer0.fired() { //Do necessary task
-        dbg(GENERAL_CHANNEL, "firring\n");
+        //dbg(GENERAL_CHANNEL, "firring\n");
        //dbg(NEIGHBOR_CHANNEL, "Timer fired : %d \n", TOS_NODE_ID);
        //dbg(GENERAL_CHANNEL, "Neighboor event \n");
        while(!(call neighborNodes.isEmpty())){
@@ -393,7 +393,7 @@ implementation{
 
       int i = 0;
       int size = call neighborNodes.size();
-      dbg(GENERAL_CHANNEL, "this fired\n\n");
+      //dbg(GENERAL_CHANNEL, "this fired\n\n");
       for(i; i<size; i++){
           int node_arr[1];
           int node = call neighborNodes.get(i);
